@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Книжковий Інтернет-магазин | Варіант 14</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Налаштування шрифту та загальні стилі */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+
+        /* Стилі для зіркового рейтингу */
+        .star-rating {
+            display: inline-block;
+            line-height: 1;
+        }
+        .star {
+            color: #ccc; /* Сіра зірка (неактивна) */
+            fill: #ccc;
+            stroke: #ccc;
+            width: 1rem;
+            height: 1rem;
+            margin-right: 0.1rem;
+        }
+        .star.filled {
+            color: #fbbf24; /* Жовта зірка (активна) */
+            fill: #fbbf24;
+            stroke: #fbbf24;
+        }
+
+        /* Стиль для модального вікна */
+        .modal {
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        .modal-content {
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal:not(.hidden) .modal-content {
+            transform: scale(1);
+        }
+
+        /* Стилі для смуги прокрутки (для кращої естетики) */
+        .scrollable-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollable-area::-webkit-scrollbar-thumb {
+            background-color: #d1d5db; /* gray-300 */
+            border-radius: 4px;
+        }
+        .scrollable-area::-webkit-scrollbar-track {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app" class="flex flex-col">
+        <!-- HEADER / NAVBAR -->
+        <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-10">
+            <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+                <h1 class="text-3xl font-bold tracking-tight mb-3 md:mb-0">
+                    <i data-lucide="library-big" class="inline-block w-6 h-6 mr-2"></i>Книжковий Магазин
+                </h1>
+
+                <!-- Пошук та Автодоповнення -->
+                <div class="relative w-full md:w-1/3">
+                    <input type="text" id="search-input" placeholder="Пошук за назвою чи автором..."
+                           class="w-full px-4 py-2 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all shadow-md">
+                    <div id="search-suggestions" class="absolute w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto z-20 hidden">
+                        <!-- Сюди додаються підказки -->
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT AREA: Catalog and Cart -->
+        <main class="container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
+            
+            <!-- Фільтри та Сортування (Sidebar) -->
+            <div class="lg:w-1/4 p-4 bg-white rounded-xl shadow-lg h-full lg:sticky top-20 border border-gray-100">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Фільтри та Сортування</h2>
+
+                <!-- Сортування -->
+                <div class="mb-6">
+                    <label for="sort-select" class="block text-sm font-medium text-gray-700 mb-2">Сортувати за:</label>
+                    <select id="sort-select" onchange="app.applyFiltersAndSort()"
+                            class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+                        <option value="popularity">Популярність (Відгуки)</option>
+                        <option value="rating">Рейтинг</option>
+                        <option value="price_asc">Ціна (Зростання)</option>
+                        <option value="price_desc">Ціна (Спадання)</option>
+                        <option value="newest">Новинки (Рік)</option>
+                    </select>
+                </div>
+
+                <!-- Фільтр за Ціною -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium text-gray-700 mb-3">Ціна (до <span id="max-price-display">600</span> грн)</h3>
+                    <input type="range" id="price-range" min="0" max="600" value="600" step="10" oninput="document.getElementById('max-price-display').textContent = this.value; app.applyFiltersAndSort()"
+                           class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer range-lg">
+                </div>
+
+                <!-- Фільтр за Жанром -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium text-gray-700 mb-3">Жанр</h3>
+                    <div id="genre-filters" class="space-y-2 max-h-40 overflow-y-auto scrollable-area p-2 rounded-lg bg-gray-50 border">
+                        <!-- Жанри будуть згенеровані JS -->
+                    </div>
+                </div>
+
+                <!-- Фільтр за Автором (Спрощена версія) -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium text-gray-700 mb-3">Автор</h3>
+                    <div id="author-filters" class="space-y-2 max-h-40 overflow-y-auto scrollable-area p-2 rounded-lg bg-gray-50 border">
+                        <!-- Автори будуть згенеровані JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Каталог Книг -->
+            <div class="lg:w-3/4">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Каталог Книг</h2>
+                <div id="book-catalog" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <!-- Книги будуть згенеровані тут -->
+                </div>
+
+                <div id="no-results" class="hidden text-center py-10 text-gray-500">
+                    <i data-lucide="book-open" class="w-10 h-10 mx-auto mb-3"></i>
+                    <p class="text-xl font-medium">Книг за вашим запитом не знайдено.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Кошик (Сайдбар) -->
+        <div id="cart-sidebar" class="fixed right-0 top-0 h-full w-full sm:w-80 bg-white shadow-2xl z-30 transform translate-x-full transition-transform duration-300 p-6 flex flex-col border-l-4 border-indigo-600">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                    <i data-lucide="shopping-cart" class="w-6 h-6 mr-2 text-indigo-600"></i>Кошик
+                </h2>
+                <button onclick="app.toggleCart()" class="text-gray-500 hover:text-gray-800 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div id="cart-items" class="flex-grow overflow-y-auto scrollable-area space-y-4 pr-2">
+                <!-- Елементи кошика будуть тут -->
+            </div>
+
+            <div id="cart-summary" class="mt-6 pt-4 border-t-2 border-indigo-100">
+                <div class="flex justify-between items-center text-xl font-bold text-gray-900">
+                    <span>Загальна сума:</span>
+                    <span id="cart-total">0.00 грн</span>
+                </div>
+                <button id="checkout-button" onclick="alert('Уявіть, що тут оформлення замовлення :)')"
+                        class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition duration-150 shadow-md shadow-indigo-200">
+                    Оформити Замовлення
+                </button>
+            </div>
+        </div>
+
+        <!-- Кнопка Кошика -->
+        <button onclick="app.toggleCart()" id="cart-button"
+                class="fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-2xl transition duration-300 transform hover:scale-105 z-40 flex items-center">
+            <i data-lucide="shopping-cart" class="w-6 h-6"></i>
+            <span id="cart-count" class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">0</span>
+        </button>
+
+        <!-- Модальне вікно для Деталей Книги -->
+        <div id="book-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden" onclick="if(event.target.id === 'book-modal') app.closeModal()">
+            <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <div id="modal-content-area" class="p-8">
+                    <!-- Деталі книги завантажуються тут -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // Визначення глобальних змінних для ініціалізації Lucide Icons
+        lucide.createIcons();
+
+        // ----------------------------------------------------------------------
+        // 1. ДАНІ (Імітація books.json)
+        // ----------------------------------------------------------------------
+        const booksData = [
+            { id: 1, title: "Тіні забутих предків", author: "Михайло Коцюбинський", genre: "Класика", price: 180, cover: "https://placehold.co/150x220/8b5cf6/ffffff?text=Книга+1", rating: 4.7, reviews: 45, pages: 128, publisher: "А-БА-БА-ГА-ЛА-МА-ГА", year: 2020, isbn: "978-617-585-134-0", inStock: true, description: "Класична повість про трагічне кохання Івана та Марічки на тлі містичної природи Карпат, пронизана духом язичництва та народних вірувань. Шедевр української літератури." },
+            { id: 2, title: "Залишенець. Чорний ворон", author: "Василь Шкляр", genre: "Історичний роман", price: 320, cover: "https://placehold.co/150x220/10b981/ffffff?text=Книга+2", rating: 4.9, reviews: 150, pages: 384, publisher: "Клуб Сімейного Дозвілля", year: 2021, isbn: "978-966-14-6889-1", inStock: true, description: "Епічний роман про боротьбу українських повстанців у Холодному Яру проти радянської влади у 1920-х роках. Героїчна і драматична історія про незламність духу." },
+            { id: 3, title: "Моя неймовірна подруга", author: "Елена Ферранте", genre: "Сучасна проза", price: 295, cover: "https://placehold.co/150x220/ef4444/ffffff?text=Книга+3", rating: 4.5, reviews: 90, pages: 400, publisher: "Vivat", year: 2023, isbn: "978-617-7694-82-4", inStock: true, description: "Перша книга Неаполітанського квартету. Зворушлива і глибока історія про складну дружбу двох дівчат, що дорослішають у бідному кварталі Неаполя." },
+            { id: 4, title: "Атлант розправив плечі", author: "Айн Ренд", genre: "Філософський роман", price: 550, cover: "https://placehold.co/150x220/3b82f6/ffffff?text=Книга+4", rating: 4.8, reviews: 210, pages: 1168, publisher: "Наш Формат", year: 2019, isbn: "978-617-7513-39-5", inStock: true, description: "Монументальний твір, що просуває ідеї об'єктивізму. Антиутопія про суспільство, в якому творчі особистості відмовляються від співпраці." },
+            { id: 5, title: "451° за Фаренгейтом", author: "Рей Бредбері", genre: "Фантастика", price: 199, cover: "https://placehold.co/150x220/f97316/ffffff?text=Книга+5", rating: 4.6, reviews: 60, pages: 256, publisher: "КМ-БУКС", year: 2024, isbn: "978-966-948-262-6", inStock: false, description: "Класична антиутопія про світ, де книги заборонені, а пожежники їх спалюють. Пророче бачення суспільства споживання." },
+            { id: 6, title: "Сад Гетсиманський", author: "Іван Багряний", genre: "Класика", price: 210, cover: "https://placehold.co/150x220/8b5cf6/ffffff?text=Книга+6", rating: 4.4, reviews: 30, pages: 512, publisher: "Фоліо", year: 2022, isbn: "978-966-03-9031-7", inStock: true, description: "Роман-сповідь про сталінські репресії, допити та ув'язнення. Потужний твір про гідність і виживання людини в умовах тоталітарної системи." },
+            { id: 7, title: "1984", author: "Джордж Орвелл", genre: "Фантастика", price: 230, cover: "https://placehold.co/150x220/f97316/ffffff?text=Книга+7", rating: 4.8, reviews: 180, pages: 320, publisher: "Видавництво Жупанського", year: 2023, isbn: "978-617-7893-29-3", inStock: true, description: "Культова антиутопія про тоталітарну державу, Великого Брата та тотальний контроль над особистістю та думками." },
+            { id: 8, title: "Дівчина, яка втекла з-під контролю", author: "Степан Процюк", genre: "Сучасна проза", price: 250, cover: "https://placehold.co/150x220/ef4444/ffffff?text=Книга+8", rating: 4.3, reviews: 55, pages: 280, publisher: "Анетта Антоненко", year: 2024, isbn: "978-617-7657-30-0", inStock: true, description: "Психологічна драма про пошуки себе та визволення від соціальних кліше у сучасному українському суспільстві." },
+        ];
+
+        // ----------------------------------------------------------------------
+        // 2. ДОПОМІЖНІ ФУНКЦІЇ
+        // ----------------------------------------------------------------------
+
+        /**
+         * Генерує HTML для зіркового рейтингу.
+         * @param {number} rating - Рейтинг від 0 до 5.
+         * @returns {string} HTML-рядок.
+         */
+        function generateStarRating(rating) {
+            const fullStars = Math.floor(rating);
+            const halfStar = rating % 1 >= 0.25 && rating % 1 <= 0.75; // Вважаємо половину, якщо 0.25 <= х <= 0.75
+            let starsHtml = `<div class="star-rating flex items-center text-sm">`;
+
+            for (let i = 1; i <= 5; i++) {
+                if (i <= fullStars) {
+                    // Повна зірка
+                    starsHtml += `<i data-lucide="star" class="star filled"></i>`;
+                } else if (i === fullStars + 1 && halfStar) {
+                    // Половина зірки (симулюємо за допомогою півзірки або просто частково заповнюємо)
+                    starsHtml += `<i data-lucide="star-half" class="star filled"></i>`;
+                } else {
+                    // Пуста зірка
+                    starsHtml += `<i data-lucide="star" class="star"></i>`;
+                }
+            }
+            starsHtml += `<span class="ml-2 font-semibold text-gray-700">(${rating.toFixed(1)})</span></div>`;
+            return starsHtml;
+        }
+
+        /**
+         * Перемішує масив (для рекомендацій).
+         * @param {Array} array
+         * @returns {Array} Перемішаний масив.
+         */
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // ----------------------------------------------------------------------
+        // 3. ОСНОВНИЙ ОБ'ЄКТ ДОДАТКУ
+        // ----------------------------------------------------------------------
+        const app = {
+            cart: [],
+            // Всі унікальні значення для фільтрів
+            allGenres: [],
+            allAuthors: [],
+
+            /**
+             * Ініціалізує додаток: завантажує кошик, генерує фільтри, відображає каталог.
+             */
+            init: function() {
+                // 1. Збір унікальних даних для фільтрів
+                this.allGenres = [...new Set(booksData.map(b => b.genre))].sort();
+                this.allAuthors = [...new Set(booksData.map(b => b.author))].sort();
+
+                // 2. Встановлення максимальної ціни для фільтра
+                const maxPrice = Math.max(...booksData.map(b => b.price));
+                const priceRange = document.getElementById('price-range');
+                priceRange.max = maxPrice;
+                priceRange.value = maxPrice;
+                document.getElementById('max-price-display').textContent = maxPrice;
+                
+                // 3. Генерація HTML фільтрів
+                this.renderFilters();
+                
+                // 4. Завантаження кошика з localStorage
+                this.loadCart();
+                
+                // 5. Встановлення слухачів подій
+                this.setupEventListeners();
+                
+                // 6. Перше відображення каталогу
+                this.applyFiltersAndSort();
+                
+                // 7. Оновлення іконок (для елементів, доданих JS)
+                lucide.createIcons();
+            },
+
+            /**
+             * Налаштовує слухачів подій для пошуку та фільтрів.
+             */
+            setupEventListeners: function() {
+                const searchInput = document.getElementById('search-input');
+                // Миттєве оновлення пошуку та автодоповнення
+                searchInput.addEventListener('input', () => {
+                    this.applyFiltersAndSort();
+                    this.renderSuggestions(searchInput.value);
+                });
+
+                // Приховування підказок при втраті фокусу
+                searchInput.addEventListener('blur', () => {
+                    // Невеликий таймаут, щоб дати час для кліку по підказці
+                    setTimeout(() => document.getElementById('search-suggestions').classList.add('hidden'), 200);
+                });
+                // Показ підказок при фокусі
+                searchInput.addEventListener('focus', () => {
+                    this.renderSuggestions(searchInput.value);
+                });
+
+                // Встановлення слухачів для фільтрів, щоб застосовувати їх при зміні
+                document.getElementById('genre-filters').addEventListener('change', this.applyFiltersAndSort.bind(this));
+                document.getElementById('author-filters').addEventListener('change', this.applyFiltersAndSort.bind(this));
+            },
+
+            // ----------------------------------------------------------------------
+            // 4. КАТАЛОГ та ФІЛЬТРИ/СОРТУВАННЯ
+            // ----------------------------------------------------------------------
+            
+            /**
+             * Генерує HTML для фільтрів (жанр, автор).
+             */
+            renderFilters: function() {
+                const genreContainer = document.getElementById('genre-filters');
+                const authorContainer = document.getElementById('author-filters');
+
+                // Жанри
+                genreContainer.innerHTML = this.allGenres.map(genre => `
+                    <div class="flex items-center">
+                        <input id="genre-${genre}" type="checkbox" name="genre" value="${genre}" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                        <label for="genre-${genre}" class="ml-3 text-sm font-medium text-gray-700 cursor-pointer">${genre}</label>
+                    </div>
+                `).join('');
+
+                // Автори (показано тільки 5, решта скроляться)
+                authorContainer.innerHTML = this.allAuthors.map(author => `
+                    <div class="flex items-center">
+                        <input id="author-${author.replace(/\s/g, '_')}" type="checkbox" name="author" value="${author}" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                        <label for="author-${author.replace(/\s/g, '_')}" class="ml-3 text-sm font-medium text-gray-700 cursor-pointer">${author}</label>
+                    </div>
+                `).join('');
+            },
+
+            /**
+             * Застосовує всі фільтри та сортування до каталогу.
+             */
+            applyFiltersAndSort: function() {
+                let filteredBooks = booksData;
+
+                // 1. Фільтр за Пошуком
+                const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
+                if (searchTerm) {
+                    filteredBooks = filteredBooks.filter(book => 
+                        book.title.toLowerCase().includes(searchTerm) || 
+                        book.author.toLowerCase().includes(searchTerm)
+                    );
+                }
+
+                // 2. Фільтр за Жанром
+                const selectedGenres = Array.from(document.querySelectorAll('#genre-filters input:checked')).map(input => input.value);
+                if (selectedGenres.length > 0) {
+                    filteredBooks = filteredBooks.filter(book => selectedGenres.includes(book.genre));
+                }
+
+                // 3. Фільтр за Автором
+                const selectedAuthors = Array.from(document.querySelectorAll('#author-filters input:checked')).map(input => input.value);
+                if (selectedAuthors.length > 0) {
+                    filteredBooks = filteredBooks.filter(book => selectedAuthors.includes(book.author));
+                }
+
+                // 4. Фільтр за Ціною
+                const maxPrice = parseFloat(document.getElementById('price-range').value);
+                filteredBooks = filteredBooks.filter(book => book.price <= maxPrice);
+
+                // 5. Сортування
+                const sortBy = document.getElementById('sort-select').value;
+                filteredBooks.sort((a, b) => {
+                    switch (sortBy) {
+                        case 'popularity':
+                            return b.reviews - a.reviews; // Від більшої кількості відгуків
+                        case 'rating':
+                            return b.rating - a.rating; // Від вищого рейтингу
+                        case 'price_asc':
+                            return a.price - b.price; // Від меншої ціни
+                        case 'price_desc':
+                            return b.price - a.price; // Від більшої ціни
+                        case 'newest':
+                            return b.year - a.year; // Від новішого року
+                        default:
+                            return 0;
+                    }
+                });
+
+                this.renderCatalog(filteredBooks);
+            },
+
+            /**
+             * Відображає відфільтрований і відсортований каталог.
+             * @param {Array<Object>} books - Масив книг для відображення.
+             */
+            renderCatalog: function(books) {
+                const catalogContainer = document.getElementById('book-catalog');
+                const noResults = document.getElementById('no-results');
+
+                if (books.length === 0) {
+                    catalogContainer.innerHTML = '';
+                    noResults.classList.remove('hidden');
+                    return;
+                }
+                noResults.classList.add('hidden');
+
+                catalogContainer.innerHTML = books.map(book => `
+                    <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition duration-300 p-4 flex flex-col items-center text-center border border-gray-100">
+                        <img src="${book.cover}" alt="Обкладинка: ${book.title}" class="w-28 h-40 object-cover rounded-lg mb-3 shadow-lg cursor-pointer" onclick="app.showBookDetails(${book.id})">
+                        
+                        <h3 class="text-lg font-bold text-gray-900 line-clamp-2 min-h-[3rem] cursor-pointer" onclick="app.showBookDetails(${book.id})">${book.title}</h3>
+                        <p class="text-sm text-gray-600 line-clamp-1 mb-2">${book.author}</p>
+                        
+                        ${generateStarRating(book.rating)}
+                        <p class="text-xs text-gray-500 mt-1 mb-3">${book.reviews} відгуків</p>
+
+                        <p class="text-2xl font-extrabold text-indigo-600 mb-4">${book.price} <span class="text-xl">грн</span></p>
+
+                        <button onclick="app.addToCart(${book.id})" 
+                                ${!book.inStock ? 'disabled' : ''}
+                                class="w-full py-2 px-4 rounded-xl font-semibold transition duration-150 ${book.inStock 
+                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md' 
+                                    : 'bg-gray-400 text-gray-700 cursor-not-allowed'}">
+                            ${book.inStock ? '<i data-lucide="plus" class="w-4 h-4 inline-block mr-1"></i> Додати в кошик' : 'Немає в наявності'}
+                        </button>
+                    </div>
+                `).join('');
+
+                lucide.createIcons();
+            },
+            
+            // ----------------------------------------------------------------------
+            // 5. ПОШУК та АВТОДОПОВНЕННЯ
+            // ----------------------------------------------------------------------
+
+            /**
+             * Рендерить підказки автодоповнення.
+             * @param {string} query - Пошуковий запит.
+             */
+            renderSuggestions: function(query) {
+                const suggestionsContainer = document.getElementById('search-suggestions');
+                if (!query.trim()) {
+                    suggestionsContainer.classList.add('hidden');
+                    return;
+                }
+
+                const lowerQuery = query.toLowerCase().trim();
+                const matches = booksData.filter(book => 
+                    book.title.toLowerCase().includes(lowerQuery) || 
+                    book.author.toLowerCase().includes(lowerQuery)
+                ).slice(0, 7); // Обмеження до 7 підказок
+
+                if (matches.length === 0) {
+                    suggestionsContainer.classList.add('hidden');
+                    return;
+                }
+
+                suggestionsContainer.innerHTML = matches.map(book => `
+                    <div class="p-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-100 last:border-b-0" 
+                         onmousedown="app.selectSuggestion('${book.title.replace(/'/g, "\\'")}')" 
+                         title="${book.author}">
+                        <p class="text-sm font-medium text-gray-900">${book.title}</p>
+                        <p class="text-xs text-gray-500">Автор: ${book.author}</p>
+                    </div>
+                `).join('');
+                
+                suggestionsContainer.classList.remove('hidden');
+            },
+
+            /**
+             * Вибирає підказку та запускає пошук.
+             * @param {string} title - Назва книги.
+             */
+            selectSuggestion: function(title) {
+                document.getElementById('search-input').value = title;
+                document.getElementById('search-suggestions').classList.add('hidden');
+                this.applyFiltersAndSort();
+            },
+            
+            // ----------------------------------------------------------------------
+            // 6. КОШИК (Cart)
+            // ----------------------------------------------------------------------
+
+            /**
+             * Завантажує кошик з localStorage.
+             */
+            loadCart: function() {
+                try {
+                    const savedCart = localStorage.getItem('bookstoreCart');
+                    this.cart = savedCart ? JSON.parse(savedCart) : [];
+                } catch (e) {
+                    console.error("Помилка завантаження кошика з localStorage:", e);
+                    this.cart = [];
+                }
+                this.updateCartUI();
+            },
+
+            /**
+             * Зберігає кошик у localStorage.
+             */
+            saveCart: function() {
+                localStorage.setItem('bookstoreCart', JSON.stringify(this.cart));
+            },
+            
+            /**
+             * Додає книгу до кошика або збільшує її кількість.
+             * @param {number} bookId - ID книги.
+             */
+            addToCart: function(bookId) {
+                const existingItem = this.cart.find(item => item.id === bookId);
+                const book = booksData.find(b => b.id === bookId);
+                
+                if (!book || !book.inStock) return;
+
+                if (existingItem) {
+                    existingItem.quantity += 1;
+                } else {
+                    this.cart.push({
+                        id: bookId,
+                        title: book.title,
+                        price: book.price,
+                        quantity: 1
+                    });
+                }
+
+                this.saveCart();
+                this.updateCartUI();
+                this.toggleCart(true); // Відкрити кошик після додавання
+            },
+
+            /**
+             * Змінює кількість книги в кошику.
+             * @param {number} bookId - ID книги.
+             * @param {number} change - Зміна кількості (+1 або -1).
+             */
+            changeQuantity: function(bookId, change) {
+                const item = this.cart.find(i => i.id === bookId);
+                if (!item) return;
+
+                item.quantity += change;
+
+                if (item.quantity <= 0) {
+                    this.removeFromCart(bookId);
+                } else {
+                    this.saveCart();
+                    this.updateCartUI();
+                }
+            },
+
+            /**
+             * Видаляє книгу з кошика.
+             * @param {number} bookId - ID книги.
+             */
+            removeFromCart: function(bookId) {
+                this.cart = this.cart.filter(item => item.id !== bookId);
+                this.saveCart();
+                this.updateCartUI();
+            },
+
+            /**
+             * Оновлює інтерфейс кошика та загальну суму.
+             */
+            updateCartUI: function() {
+                const itemsContainer = document.getElementById('cart-items');
+                const totalDisplay = document.getElementById('cart-total');
+                const countDisplay = document.getElementById('cart-count');
+
+                let total = 0;
+                let itemCount = 0;
+
+                if (this.cart.length === 0) {
+                    itemsContainer.innerHTML = '<p class="text-center text-gray-500 py-4">Кошик порожній :(</p>';
+                } else {
+                    itemsContainer.innerHTML = this.cart.map(item => {
+                        const book = booksData.find(b => b.id === item.id);
+                        if (!book) return '';
+
+                        const itemTotal = item.price * item.quantity;
+                        total += itemTotal;
+                        itemCount += item.quantity;
+
+                        return `
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg shadow-sm border border-gray-200">
+                                <img src="${book.cover}" alt="${item.title}" class="w-12 h-16 object-cover rounded mr-3">
+                                <div class="flex-grow min-w-0">
+                                    <p class="font-semibold text-sm line-clamp-2">${item.title}</p>
+                                    <p class="text-xs text-gray-500">${item.price} грн x ${item.quantity}</p>
+                                </div>
+                                <div class="flex items-center text-sm ml-3">
+                                    <button onclick="app.changeQuantity(${item.id}, -1)" class="p-1 bg-white border rounded-l-md hover:bg-gray-100 transition">
+                                        <i data-lucide="minus" class="w-4 h-4"></i>
+                                    </button>
+                                    <span class="px-3 py-1 bg-white border-t border-b">${item.quantity}</span>
+                                    <button onclick="app.changeQuantity(${item.id}, 1)" class="p-1 bg-white border rounded-r-md hover:bg-gray-100 transition">
+                                        <i data-lucide="plus" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                                <button onclick="app.removeFromCart(${item.id})" class="ml-3 text-red-500 hover:text-red-700 transition">
+                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                totalDisplay.textContent = `${total.toFixed(2)} грн`;
+                countDisplay.textContent = itemCount > 99 ? '99+' : itemCount.toString();
+                lucide.createIcons();
+            },
+
+            /**
+             * Перемикає відображення бічної панелі кошика.
+             * @param {boolean} [show] - Явно показати (true) або приховати (false).
+             */
+            toggleCart: function(show) {
+                const sidebar = document.getElementById('cart-sidebar');
+                const isHidden = sidebar.classList.contains('translate-x-full');
+
+                if (show === true || (show === undefined && isHidden)) {
+                    sidebar.classList.remove('translate-x-full');
+                    document.body.classList.add('overflow-hidden');
+                } else {
+                    sidebar.classList.add('translate-x-full');
+                    document.body.classList.remove('overflow-hidden');
+                }
+            },
+            
+            // ----------------------------------------------------------------------
+            // 7. ДЕТАЛІ КНИГИ та РЕКОМЕНДАЦІЇ
+            // ----------------------------------------------------------------------
+
+            /**
+             * Відображає модальне вікно з деталями книги.
+             * @param {number} bookId - ID книги.
+             */
+            showBookDetails: function(bookId) {
+                const book = booksData.find(b => b.id === bookId);
+                if (!book) return;
+
+                const modalContent = document.getElementById('modal-content-area');
+
+                modalContent.innerHTML = `
+                    <div class="flex justify-between items-start border-b pb-4 mb-6">
+                        <h2 class="text-3xl font-extrabold text-gray-900">${book.title}</h2>
+                        <button onclick="app.closeModal()" class="text-gray-500 hover:text-gray-800 transition p-1 ml-4 rounded-full hover:bg-gray-100">
+                            <i data-lucide="x" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-col lg:flex-row gap-8">
+                        <!-- Секція Обкладинки та Рейтингу -->
+                        <div class="lg:w-1/3 flex flex-col items-center">
+                            <img src="${book.cover}" alt="Обкладинка: ${book.title}" class="w-48 h-72 object-cover rounded-xl shadow-2xl mb-4">
+                            ${generateStarRating(book.rating)}
+                            <p class="text-sm text-gray-600 mt-1">${book.reviews} відгуків</p>
+                            
+                            <p class="text-4xl font-extrabold text-indigo-600 my-4">${book.price} грн</p>
+
+                            <button onclick="app.addToCart(${book.id})" 
+                                    ${!book.inStock ? 'disabled' : ''}
+                                    class="w-full py-3 px-4 rounded-xl font-bold text-lg transition duration-150 mb-2 ${book.inStock 
+                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md' 
+                                        : 'bg-gray-400 text-gray-700 cursor-not-allowed'}">
+                                ${book.inStock ? 'Купити' : 'Немає в наявності'}
+                            </button>
+                            <button onclick="app.toggleFavorite(${book.id})" id="favorite-btn-${book.id}"
+                                    class="w-full py-2 px-4 rounded-xl font-semibold border border-gray-300 hover:bg-gray-50 transition flex items-center justify-center text-gray-700">
+                                <i data-lucide="heart" class="w-5 h-5 mr-2 text-red-500"></i> Додати в Обране
+                            </button>
+                        </div>
+
+                        <!-- Секція Деталей та Огляду -->
+                        <div class="lg:w-2/3">
+                            <h3 class="text-xl font-bold mb-3 text-gray-800">Про книгу:</h3>
+                            <p class="text-gray-700 mb-6 leading-relaxed border-b pb-4">${book.description}</p>
+                            
+                            <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+                                <p><span class="font-medium text-gray-600">Автор:</span> <span class="font-semibold text-gray-800">${book.author}</span></p>
+                                <p><span class="font-medium text-gray-600">Жанр:</span> <span class="font-semibold text-gray-800">${book.genre}</span></p>
+                                <p><span class="font-medium text-gray-600">Видавництво:</span> <span class="font-semibold text-gray-800">${book.publisher}</span></p>
+                                <p><span class="font-medium text-gray-600">Рік видання:</span> <span class="font-semibold text-gray-800">${book.year}</span></p>
+                                <p><span class="font-medium text-gray-600">Кількість сторінок:</span> <span class="font-semibold text-gray-800">${book.pages}</span></p>
+                                <p><span class="font-medium text-gray-600">ISBN:</span> <span class="font-semibold text-gray-800">${book.isbn}</span></p>
+                            </div>
+                            
+                            <div id="recommendation-area">
+                                <!-- Рекомендації будуть завантажені тут -->
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Відображення модального вікна та завантаження рекомендацій
+                document.getElementById('book-modal').classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+                lucide.createIcons();
+                this.renderRecommendations(bookId);
+            },
+
+            /**
+             * Генерує та відображає рекомендації.
+             * @param {number} currentBookId - ID поточної книги.
+             */
+            renderRecommendations: function(currentBookId) {
+                const currentBook = booksData.find(b => b.id === currentBookId);
+                const recContainer = document.getElementById('recommendation-area');
+
+                if (!currentBook) return;
+
+                // 1. "Схожі книги" за жанром
+                let similarBooks = booksData
+                    .filter(b => b.id !== currentBookId && b.genre === currentBook.genre)
+                    .slice(0, 4);
+                
+                // Якщо замало, додаємо випадкові книги
+                if (similarBooks.length < 4) {
+                    const randomBooks = shuffleArray(booksData)
+                        .filter(b => b.id !== currentBookId && b.genre !== currentBook.genre)
+                        .slice(0, 4 - similarBooks.length);
+                    similarBooks = similarBooks.concat(randomBooks);
+                }
+
+                // 2. "Люди також купували" (симулюємо випадковими, що не є поточною)
+                const alsoBought = shuffleArray(booksData)
+                    .filter(b => b.id !== currentBookId && !similarBooks.map(s => s.id).includes(b.id))
+                    .slice(0, 4);
+
+
+                const generateRecSection = (title, books) => `
+                    <h4 class="text-lg font-bold mt-6 mb-3 border-t pt-4 text-gray-800">${title}</h4>
+                    <div class="flex space-x-4 overflow-x-auto pb-2 scrollable-area">
+                        ${books.map(book => `
+                            <div class="flex-shrink-0 w-28 text-center cursor-pointer" onclick="app.showBookDetails(${book.id})">
+                                <img src="${book.cover}" alt="${book.title}" class="w-28 h-40 object-cover rounded-lg shadow-md hover:shadow-lg transition">
+                                <p class="text-xs font-medium mt-1 line-clamp-2">${book.title}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                recContainer.innerHTML = 
+                    generateRecSection('Схожі книги (за жанром: ' + currentBook.genre + ')', similarBooks) +
+                    generateRecSection('Люди також купували', alsoBought);
+            },
+
+            /**
+             * Логіка для "Додати в обране" (спрощена, без зберігання).
+             * @param {number} bookId - ID книги.
+             */
+            toggleFavorite: function(bookId) {
+                const btn = document.getElementById(`favorite-btn-${bookId}`);
+                if (!btn) return;
+                
+                const isFavorite = btn.classList.toggle('text-white');
+                btn.classList.toggle('bg-red-500', isFavorite);
+                btn.classList.toggle('hover:bg-red-600', isFavorite);
+                btn.classList.toggle('bg-gray-50', !isFavorite);
+                btn.classList.toggle('hover:bg-gray-100', !isFavorite);
+                btn.classList.toggle('border-gray-300', !isFavorite);
+                
+                const heartIcon = btn.querySelector('i');
+                if(heartIcon) {
+                    heartIcon.setAttribute('data-lucide', isFavorite ? 'heart-handshake' : 'heart');
+                    heartIcon.classList.toggle('text-white', isFavorite);
+                    heartIcon.classList.toggle('text-red-500', !isFavorite);
+                }
+
+                // Симуляція повідомлення
+                const action = isFavorite ? 'додано' : 'видалено';
+                console.log(`Книгу (ID: ${bookId}) ${action} до обраного.`);
+            },
+
+            /**
+             * Закриває модальне вікно.
+             */
+            closeModal: function() {
+                document.getElementById('book-modal').classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        };
+
+        // Запуск додатку після завантаження DOM
+        window.onload = function() {
+            app.init();
+        }
+
+        // Робимо app доступним у глобальній області видимості для HTML обробників
+        window.app = app;
+    </script>
+</body>
+</html>
